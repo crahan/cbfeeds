@@ -22,6 +22,10 @@ def get_tor_nodes():
     for entry in text['relays']:
         try:
             for address in entry['or_addresses']:
+                if 'accept' in entry['exit_policy_summary']:
+                    node_type = 'exit'
+                else:
+                    node_type = 'relay'
                 # IPv4 addresses are ip:port, IPv6 addresses are [ip]:port:
                 # "or_addresses":["80.101.115.170:5061","[2001:980:3b4f:1:240:caff:fe8d:f02c]:5061"],
                 # process only IPv4 addresses for now
@@ -33,7 +37,8 @@ def get_tor_nodes():
                                   'port': port,
                                   'firstseen': entry['first_seen'],
                                   'lastseen': entry['last_seen'],
-                                  'contact': entry.get("contact", "none")})
+                                  'contact': entry.get("contact", "none"),
+                                  'type': node_type})
         except Exception, err:
             print "%s while parsing: %s" % (err, entry)
     return nodes
@@ -52,14 +57,14 @@ def build_reports(nodes):
             unique_ips.add(node['ip'])
 
         fields = {'iocs': {
-            'ipv4': [node['ip'], ]
-        },
+                     'ipv4': [node['ip'], ]
+                     },
                   'score': 0,
                   'timestamp': int(time.mktime(time.gmtime())),
                   'link': 'http://www.torproject.org',
                   'id': "TOR-Node-%s" % node['ip'],
-                  'title': "%s has been a TOR exit node since %s and was last seen %s on port %s. Contact: %s"
-                           % (node['ip'], node['firstseen'], node['lastseen'], node['port'], node['contact'])}
+                  'title': "%s has been a TOR %s node since %s and was last seen %s on port %s. Contact: %s"
+                           % (node['ip'],node['type'], node['firstseen'], node['lastseen'], node['port'], node['contact'])}
         reports.append(CbReport(**fields))
 
     return reports
@@ -70,7 +75,7 @@ def create():
     reports = build_reports(nodes)
 
     feedinfo = {'name': 'tor',
-                'display_name': "Tor Exit Nodes",
+                'display_name': "Tor Exit & Relay Nodes",
                 'provider_url': 'https://www.torproject.org/',
                 'summary': "This feed is a list of Tor Node IP addresses, updated every 30 minutes.",
                 'tech_data': "There are no requirements to share any data to receive this feed.",
